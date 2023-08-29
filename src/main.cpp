@@ -5,15 +5,26 @@
 RCSwitch ReceiverModule = RCSwitch();
 
 // Constants
-const int ACTUATOR_RELAY_PIN = 2;
+const int ACTUATOR_RELAY_PIN = 4;
 const int SERIAL_BAUD_RATE = 9600;
 
 // Receiver values
-const int RECEIVER_UP_VALUE = 2678888;
-const int RECEIVER_MIDDLE_VALUE = 2678884;
-const int RECEIVER_DOWN_VALUE = 2678882;
+const unsigned long RECEIVER_UP_VALUE = 2678888;
+const unsigned long RECEIVER_MIDDLE_VALUE = 2678884;
+const unsigned long RECEIVER_DOWN_VALUE = 2678882;
 const int RECEIVER_PROTOCOL = 1;
 const int RECEIVER_BIT_LENGTH = 24;
+
+// Enum for the RF signals
+enum RFSignal {
+    RF_UP = 1,
+    RF_MIDDLE = 2,
+    RF_DOWN = 3,
+    RF_NONE = 0
+};
+
+// Function declarations
+RFSignal receiveRFSignals();
 
 // Setup for the arudino
 void setup()
@@ -31,27 +42,55 @@ void setup()
 // Loop for the arduino
 void loop()
 {
+    // Receive the rf signals
+    int received_signal = receiveRFSignals();
 
-    // Activate the relay
-    digitalWrite(ACTUATOR_RELAY_PIN, HIGH);
+    // Print the received signal
+    // Serial.println(received_signal);
+
+    // if the signal is up, then turn off the relay
+    if (received_signal == RF_UP)
+    {
+        digitalWrite(ACTUATOR_RELAY_PIN, LOW);
+    }else if (received_signal == RF_DOWN)
+    {
+        digitalWrite(ACTUATOR_RELAY_PIN, HIGH);
+    }
+
+    // Wait for 100ms
+    delay(100);
+}
+
+/**
+ * @brief Receive the rf signals from the remote
+ * @return int
+ */
+RFSignal receiveRFSignals()
+{
+    // Return value
+    RFSignal returnValue = RF_NONE;
 
     if (ReceiverModule.available())
     {
         // Detect the received value
         if (ReceiverModule.getReceivedValue() == RECEIVER_UP_VALUE && ReceiverModule.getReceivedBitlength() == RECEIVER_BIT_LENGTH && ReceiverModule.getReceivedProtocol() == RECEIVER_PROTOCOL)
         {
-            Serial.println("Up");
-        }else if (ReceiverModule.getReceivedValue() == RECEIVER_MIDDLE_VALUE && ReceiverModule.getReceivedBitlength() == RECEIVER_BIT_LENGTH && ReceiverModule.getReceivedProtocol() == RECEIVER_PROTOCOL)
+            returnValue = RF_UP;
+        }
+        else if (ReceiverModule.getReceivedValue() == RECEIVER_MIDDLE_VALUE && ReceiverModule.getReceivedBitlength() == RECEIVER_BIT_LENGTH && ReceiverModule.getReceivedProtocol() == RECEIVER_PROTOCOL)
         {
-            Serial.println("Middle");
-        }else if (ReceiverModule.getReceivedValue() == RECEIVER_DOWN_VALUE && ReceiverModule.getReceivedBitlength() == RECEIVER_BIT_LENGTH && ReceiverModule.getReceivedProtocol() == RECEIVER_PROTOCOL)
+            returnValue = RF_MIDDLE;
+        }
+        else if (ReceiverModule.getReceivedValue() == RECEIVER_DOWN_VALUE && ReceiverModule.getReceivedBitlength() == RECEIVER_BIT_LENGTH && ReceiverModule.getReceivedProtocol() == RECEIVER_PROTOCOL)
         {
-            Serial.println("Down");
+            returnValue = RF_DOWN;
         }
 
-        // Reset the receiver 
+        // Reset the receiver
         ReceiverModule.resetAvailable();
     }
+
+    return returnValue;
 }
 
 // IMU reader
