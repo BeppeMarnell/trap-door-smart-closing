@@ -21,3 +21,10 @@ This project utilizes a range of hardware components to achieve precise and auto
 - RF Receiver Bypass: We've bypassed the original RF receiver that was directly connected to the linear actuator. This modification enables more precise control over the actuator, allowing us to carefully stop its movements during the door closure process.
 
 These hardware components, in combination with the Arduino Nano and the software code, create a reliable and efficient smart door closure system that enhances control and safety while maintaining ease of operation.
+
+### Trap Door
+![image1](https://github.com/BeppeMarnell/trap-door-smart-closing/blob/main/res/trapdoor.jpeg)
+![image2](https://github.com/BeppeMarnell/trap-door-smart-closing/blob/main/res/trapdoor.jpeg)
+### Circuit
+![circuit1](https://github.com/BeppeMarnell/trap-door-smart-closing/blob/main/res/system.jpeg)
+
