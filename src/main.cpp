@@ -29,6 +29,7 @@ enum TrapDoorState
 RCSwitch ReceiverModule = RCSwitch();
 /* Assign a unique ID to this sensor */
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
+boolean isAccelThere = false;
 /* Create a bool that deactivates the state machine and the actuator 
    To reset the freeFalling you need to restart the program */
 boolean freeFalling = false;
@@ -88,6 +89,8 @@ void setup()
         Serial.println("No ADXL345 detected ... Check your wiring!");
         while (1)
             ;
+    }else{
+        isAccelThere = true;
     }
 
     /* Set the range to whatever is appropriate for your project */
@@ -106,32 +109,24 @@ void setup()
     }
 
     /* Get a new sensor event */
-    sensors_event_t event;
-    accel.getEvent(&event);
+    if(isAccelThere){
+        sensors_event_t event;
+        accel.getEvent(&event);
 
-    /* Get the angle */
-    float tilt_angle = getAngleAroundYAxis(event.acceleration.x, event.acceleration.y, event.acceleration.z);
+        /* Get the angle */
+        float tilt_angle = getAngleAroundYAxis(event.acceleration.x, event.acceleration.y, event.acceleration.z);
 
-    /* Check if the trap door is fully opened at the start */
-    if (isDoorFullyOpened(tilt_angle))
-    {
-        trapDoorCurrentState = TRAP_DOOR_FULLY_OPENED;
+        /* Check if the trap door is fully opened at the start */
+        if (isDoorFullyOpened(tilt_angle))
+        {
+            trapDoorCurrentState = TRAP_DOOR_FULLY_OPENED;
+        }
     }
 }
 
 /* Loop for the arduino */
 void loop()
 {
-    // print the state
-    // Serial.print("State: ");
-    // Serial.print(trapDoorCurrentState);
-    // Serial.println("");
-
-    // print the trap door end switch value
-    // Serial.print("End Switch: ");
-    // Serial.print(digitalRead(END_SWITCH_PIN));
-    // Serial.println("");
-
     /* Receive the rf signals */
     int received_signal = receiveRFSignals();
 
@@ -151,10 +146,7 @@ void loop()
 
     /* Get the angle */
     float tilt_angle = getAngleAroundYAxis(event.acceleration.x, event.acceleration.y, event.acceleration.z);
-    // Serial.println(tilt_angle);
 
-    // Serial.println(received_signal);
-    // Serial.println(digitalRead(END_SWITCH_PIN));
     if (freeFalling){
         /* Activate the actuator, always on */
         digitalWrite(ACTUATOR_RELAY_PIN, HIGH);
@@ -233,7 +225,20 @@ double getAngleAroundYAxis(double x, double y, double z)
  */
 boolean isDoorFullyOpened(double angle)
 {
-    double const offset = 5;
+    /* If the accelerometer is not there, always return false */
+    if (!isAccelThere){
+        return false;
+    }
+
+    /* Constant for the offset */
+    double const offset = 1;
+
+    /* Check for the angle and print error */
+    if (angle < 160 || angle > 290){
+        Serial.println('SENSOR READING ERROR');
+        return false;
+    }
+
     if ((angle - offset) <= TRAP_DOOR_OPENED_ANGLE)
     {
         return true;
