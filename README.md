@@ -28,4 +28,5 @@ These hardware components, in combination with the Arduino Nano and the software
 ### Circuit
 ![circuit1](https://github.com/BeppeMarnell/trap-door-smart-closing/blob/main/res/system.jpeg)
 ![circuit2](https://github.com/BeppeMarnell/trap-door-smart-closing/blob/main/res/PCB_drawing.png)
+![circuit3](https://github.com/BeppeMarnell/trap-door-smart-closing/blob/main/res/system2.jpeg)
 
