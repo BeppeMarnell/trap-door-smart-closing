@@ -1,5 +1,7 @@
 # Smart Door Closure with Adjustable Actuator
 
+#### For more information on this project, you can contact me on [linkedin](https://www.linkedin.com/in/beppemarnell/)
+
 ### Description
 Automated Smart Door Closure System with Adjustable Linear Actuator Control is a practical solution for automating the closing of doors or trap-doors using a linear actuator while preventing damage or over-closure. This project addresses the common problem where a linear actuator has a longer range of motion than required, causing doors or trap-doors to close too much and potentially collide with the frame.
 
