@@ -27,19 +27,28 @@ enum TrapDoorState
 
 /* Create a new instance of the RCSwitch class for receiving messages from the remote */
 RCSwitch ReceiverModule = RCSwitch();
+/* Create a new instance of the RCSwitch class for transmitting messages to the motor */
+RCSwitch TransmitterModule = RCSwitch();
+
 /* Assign a unique ID to this sensor */
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 boolean isAccelThere = false;
-/* Create a bool that deactivates the state machine and the actuator 
+/* Create a bool that deactivates the state machine and the actuator
    To reset the freeFalling you need to restart the program */
 boolean freeFalling = false;
 int freeFallingCounter = 0;
 
-/* Constants */
+/* Constants  ---------------*/
 const int ACTUATOR_RELAY_PIN = 4;
+/* End switch */
 const int END_SWITCH_PIN = 5;
 const int END_SWITCH_OPEN_VALUE = 1;
 const int END_SWITCH_CLOSED_VALUE = 0;
+/* Button */
+const int BUTTON_UP_PIN = 7;
+const int BUTTON_DOWN_PIN = 6;
+RFSignal previousButtonState = RF_NONE;
+/* Baudrate serial monitor */
 const int SERIAL_BAUD_RATE = 9600;
 
 /* Trap Door state */
@@ -59,6 +68,8 @@ const int RECEIVER_BIT_LENGTH = 24;
 double getAngleAroundYAxis(double x, double y, double z);
 /* RF function method */
 RFSignal receiveRFSignals();
+/* RF Button redirect */
+RFSignal readButtonState();
 /* Check if the door is fully opened */
 boolean isDoorFullyOpened(double angle);
 /* Trap door state machine */
@@ -73,6 +84,9 @@ void setup()
     /* This needs to be digital pin 2 on the arduino */
     ReceiverModule.enableReceive(0); // Receiver on interrupt 0 => that is pin #2
 
+    /* Enable transmitter on pin digital pin 3 */
+    TransmitterModule.enableTransmit(3);
+
     /* Make the actuator relay pin as output */
     pinMode(ACTUATOR_RELAY_PIN, OUTPUT);
 
@@ -82,19 +96,32 @@ void setup()
     /* Make the end switch pin as input */
     pinMode(END_SWITCH_PIN, INPUT_PULLUP);
 
+    /* Make the up and down button a pullup */
+    pinMode(BUTTON_UP_PIN, INPUT_PULLUP);
+    pinMode(BUTTON_DOWN_PIN, INPUT_PULLUP);
+
     /* Initialise the sensor */
     if (!accel.begin())
     {
         /* There was a problem detecting the ADXL345 ... check your connections */
-        Serial.println("No ADXL345 detected ... Check your wiring!");
-        while (1)
-            ;
-    }else{
+        Serial.println("No ADXL345 detected ... Check your wiring! Setting the system to free falling.");
+        isAccelThere = false;
+
+        // Free falling
+        freeFalling = true;
+    }
+    else
+    {
         isAccelThere = true;
     }
 
     /* Set the range to whatever is appropriate for your project */
     accel.setRange(ADXL345_RANGE_2_G);
+
+    // Add delay to make sure everything is ready
+    delay(1000);
+
+    /* Setting up the STATE MACHINE ---------------------------------- */
 
     /* After the setup and before the main loop,
     we need to set the state of the trap door */
@@ -109,7 +136,8 @@ void setup()
     }
 
     /* Get a new sensor event */
-    if(isAccelThere){
+    if (isAccelThere)
+    {
         sensors_event_t event;
         accel.getEvent(&event);
 
@@ -127,8 +155,18 @@ void setup()
 /* Loop for the arduino */
 void loop()
 {
+    /* If the button is pressed, send the signal */
+    RFSignal buttonPressed = readButtonState();
+
     /* Receive the rf signals */
-    int received_signal = receiveRFSignals();
+    RFSignal received_signal = RF_NONE;
+    /* If the button is pressed, let's skip the receiver */
+    if(buttonPressed == RF_NONE){
+        received_signal = receiveRFSignals();
+    }else{
+        /* If the button is pressed, we set the received signal to the button pressed */
+        received_signal = buttonPressed;
+    }
 
     /* If we receive a middle signal, we increase the free falling counter */
     if (received_signal == RF_MIDDLE)
@@ -140,32 +178,87 @@ void loop()
         }
     }
 
-    /* Get a new sensor event */
-    sensors_event_t event;
-    accel.getEvent(&event);
-
-    /* Get the angle */
-    float tilt_angle = getAngleAroundYAxis(event.acceleration.x, event.acceleration.y, event.acceleration.z);
-
-    if (freeFalling){
+    if (freeFalling)
+    {
         /* Activate the actuator, always on */
         digitalWrite(ACTUATOR_RELAY_PIN, HIGH);
-    }else{
+    }
+    else
+    {
+        /* Get a new sensor event */
+        sensors_event_t event;
+        accel.getEvent(&event);
+
+        /* Get the angle */
+        float tilt_angle = getAngleAroundYAxis(event.acceleration.x, event.acceleration.y, event.acceleration.z);
+
         /* Run the trap door state machine if not on free falling*/
         trapDoorStateMachine(tilt_angle, received_signal);
     }
 
-    /* Reset the receiver. Always keep this here */
+    /* Reset the receiver and Transmitter. Always keep this here */
     ReceiverModule.resetAvailable();
+    TransmitterModule.resetAvailable();
 
-    /* Wait for 100ms */
+    /* Wait for 200ms */
     delay(200);
+}
+
+/**
+ * @brief Reads the state of the up and down button.
+ *
+ * This function checks if the up or down button is pressed. If the up button is pressed, it sends the up signal to the motor. If the down button is pressed, it sends the down signal to the motor.
+ * When the button is pressed, we disable temporarily the receiver, as it it reduntant.
+ * @return True if the button is pressed, false otherwise.
+ */
+RFSignal readButtonState()
+{
+    /* Return value tmp */
+    RFSignal buttonSignal = previousButtonState;
+
+    /* If the button is pressed (up or down), send the signal with RC */
+    if (digitalRead(BUTTON_UP_PIN) == LOW)
+    {
+        TransmitterModule.send(RECEIVER_UP_VALUE, RECEIVER_BIT_LENGTH);
+        buttonSignal = RF_UP;
+    }
+    else if (digitalRead(BUTTON_DOWN_PIN) == LOW)
+    {
+        TransmitterModule.send(RECEIVER_DOWN_VALUE, RECEIVER_BIT_LENGTH);
+        buttonSignal = RF_DOWN;
+    }
+
+    /* If we press a different button than the previous, we send the middle.
+       This allows us to stop the motor. */
+    if (buttonSignal != previousButtonState && previousButtonState != RF_NONE)]'[poiuytrdeswedrtyuiop[;oiuygtfrdsxc fdre43wsxzaqw211§   `÷'|][=-p0okm, ÷"|=-][p';?]]'
+    {
+        /* Send Three times, waiting for a little */
+        TransmitterModule.send(RECEIVER_MIDDLE_VALUE, RECEIVER_BIT_LENGTH);
+        delay(100);
+        TransmitterModule.send(RECEIVER_MIDDLE_VALUE, RECEIVER_BIT_LENGTH);
+        delay(100);
+        TransmitterModule.send(RECEIVER_MIDDLE_VALUE, RECEIVER_BIT_LENGTH);
+
+        /* Return the middle signal */
+        /* Assign previous state such that it is never middle */
+        previousButtonState = RF_NONE;
+        return RF_MIDDLE;
+    }else{
+        /* Assign previous state such that it is never middle */
+        previousButtonState = buttonSignal;
+    }
+
+    return buttonSignal;
 }
 
 /**
  * @brief Receive the RF signals from the remote.
  *
- * This function checks if the receiver module is available and if a signal has been received. If a signal has been received, it checks the value, bit length, and protocol of the signal and returns the corresponding RFSignal enum value. If no signal has been received, it returns RF_NONE.
+ * This function checks if the receiver module is available and if 
+ * a signal has been received. If a signal has been received, it checks 
+ * the value, bit length, and protocol of the signal and returns the 
+ * corresponding RFSignal enum value. 
+ * If no signal has been received, it returns RF_NONE.
  *
  * @return The RFSignal enum value corresponding to the received signal, or RF_NONE if no signal has been received.
  */
@@ -217,7 +310,8 @@ double getAngleAroundYAxis(double x, double y, double z)
 /**
  * @brief Checks if the trap door is fully opened.
  *
- * This function checks if the trap door is fully opened by checking if the angle is greater than or equal to the TRAP_DOOR_OPENED_ANGLE.
+ * This function checks if the trap door is fully opened by checking if 
+ * the angle is greater than or equal to the TRAP_DOOR_OPENED_ANGLE.
  *
  * @param angle The angle of the trap door.
  *
@@ -226,7 +320,8 @@ double getAngleAroundYAxis(double x, double y, double z)
 boolean isDoorFullyOpened(double angle)
 {
     /* If the accelerometer is not there, always return false */
-    if (!isAccelThere){
+    if (!isAccelThere)
+    {
         return false;
     }
 
@@ -234,7 +329,8 @@ boolean isDoorFullyOpened(double angle)
     double const offset = 1;
 
     /* Check for the angle and print error */
-    if (angle < 160 || angle > 290){
+    if (angle < 160 || angle > 290)
+    {
         Serial.println('SENSOR READING ERROR');
         return false;
     }
